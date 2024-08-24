@@ -127,6 +127,10 @@ def recursive_execute(server, prompt, outputs, current_item, extra_data, execute
 
     for x in inputs:
         input_data = inputs[x]
+        
+        # enabling recursive links
+        if '_recursive' in x:
+            continue
 
         if isinstance(input_data, list):
             input_unique_id = input_data[0]
@@ -140,6 +144,19 @@ def recursive_execute(server, prompt, outputs, current_item, extra_data, execute
     input_data_all = None
     try:
         input_data_all = get_input_data(inputs, class_def, unique_id, outputs, prompt, extra_data)
+        
+        # enabling recursive links
+        keys_recursive = list(input_data_all.keys())
+        keys_recursive = [x for x in keys_recursive if '_recursive' in x]
+        for key in keys_recursive:
+            recursive_origin_id = inputs[key]
+            
+            # check if the origin node was already executed on previous comfy iteration
+            recursive_origin_class_type = prompt[recursive_origin_id[0]]['class_type']
+            obj_recursive_origin = object_storage.get((recursive_origin_id[0], recursive_origin_class_type), None)
+            if obj_recursive_origin is not None:
+                input_data_all[key] = [obj_recursive_origin.last_output_data[recursive_origin_id[1]][0]]
+        
         if server.client_id is not None:
             server.last_node_id = unique_id
             server.send_sync("executing", { "node": unique_id, "prompt_id": prompt_id }, server.client_id)
@@ -150,6 +167,10 @@ def recursive_execute(server, prompt, outputs, current_item, extra_data, execute
             object_storage[(unique_id, class_type)] = obj
 
         output_data, output_ui = get_output_data(obj, input_data_all)
+        
+        # enabling recursive links
+        obj.last_output_data = output_data
+        
         outputs[unique_id] = output_data
         if len(output_ui) > 0:
             outputs_ui[unique_id] = output_ui
@@ -215,6 +236,11 @@ def recursive_will_execute(prompt, outputs, current_item, memo={}):
         if isinstance(input_data, list):
             input_unique_id = input_data[0]
             output_index = input_data[1]
+            
+            # enabling recursive links
+            if '_recursive' in x:
+                continue
+            
             if input_unique_id not in outputs:
                 will_execute += recursive_will_execute(prompt, outputs, input_unique_id, memo)
 
@@ -436,6 +462,11 @@ def validate_inputs(prompt, item, validated):
         validate_function_inputs = inspect.getfullargspec(obj_class.VALIDATE_INPUTS).args
 
     for x in required_inputs:
+        
+        # enabling recursive links
+        if '_recursive' in x:
+            continue
+        
         if x not in inputs:
             error = {
                 "type": "required_input_missing",

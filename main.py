@@ -104,7 +104,7 @@ def prompt_worker(q, server):
     e = execution.PromptExecutor(server)
     last_gc_collect = 0
     need_gc = False
-    gc_collect_interval = 10.0
+    gc_collect_interval = 3600
 
     while True:
         timeout = 1000.0
@@ -131,7 +131,7 @@ def prompt_worker(q, server):
 
             current_time = time.perf_counter()
             execution_time = current_time - execution_start_time
-            logging.info("Prompt executed in {:.2f} seconds".format(execution_time))
+            logging.info("FPS: {:.2f}".format(1/execution_time))
 
         flags = q.get_flags()
         free_memory = flags.get("free_memory", False)
